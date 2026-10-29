@@ -1,0 +1,83 @@
+# Render Blueprint - the whole stack as one declarative file.
+#
+#   render blueprint launch          # or: connect the repo in the dashboard
+#
+# NOT EXECUTED. This is the documented deployment path described in the
+# README; nothing here has been run against a live Render account.
+#
+# Render is the pick because its free tier covers all four pieces TaskFlow
+# needs (web service, two background workers, managed Postgres, managed
+# Redis) in a single blueprint. The same shape maps onto Fly.io
+# (fly.toml + `fly machines run` for the workers) or a plain VM running
+# docker-compose.yml as-is.
+
+databases:
+  - name: taskflow-db
+    plan: free
+    databaseName: taskflow
+    user: taskflow
+
+services:
+  - type: redis
+    name: taskflow-redis
+    plan: free
+    ipAllowList: [] # reachable only from inside the Render private network
+    # IMPORTANT: this must not be allkeys-lru. The cache stores project
+    # version counters without a TTL, and volatile-lru is what guarantees
+    # they are never evicted. See app/services/cache.py.
+    maxmemoryPolicy: volatile-lru
+
+  - type: web
+    name: taskflow-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # Migrations run once per deploy, before the new instance takes traffic.
+    preDeployCommand: alembic upgrade head
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    envVars: &app-env
+      - key: DATABASE_URL
+        fromDatabase:
+          name: taskflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: taskflow-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: taskflow-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: taskflow-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # Render mints and stores it; never in the repo
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: worker
+    name: taskflow-worker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=2
+    envVars: *app-env
+
+  - type: worker
+    name: taskflow-beat
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    # Must stay at a single instance: two beats would double every tick.
+    # The jobs are idempotent so nothing would corrupt, but it is wasted work.
+    numInstances: 1
+    dockerCommand: celery -A app.workers.celery_app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    envVars: *app-env
