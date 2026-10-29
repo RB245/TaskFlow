@@ -1,0 +1,36 @@
+# Backing services only - for running the test suite or the app directly on the
+# host. Non-default host ports so this never collides with a local Postgres or
+# Redis you already have running.
+#
+#   docker compose -f docker-compose.test.yml up -d
+#   pytest
+
+services:
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow
+      POSTGRES_DB: taskflow_test
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data # throwaway data, much faster
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test-redis:
+    image: redis:7-alpine
+    # See docker-compose.yml for why the eviction policy matters to cache
+    # correctness.
+    command: ["redis-server", "--maxmemory-policy", "volatile-lru", "--save", ""]
+    ports:
+      - "56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
