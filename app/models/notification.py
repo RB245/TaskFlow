@@ -25,11 +25,13 @@ class Notification(UUIDPrimaryKey, Timestamps, Base):
         # same dedupe_key, so the insert loses the race instead of creating a
         # duplicate - correctness does not depend on the worker behaving.
         UniqueConstraint("task_id", "type", "dedupe_key"),
+        # Serves both the "my notifications, newest first" feed and plain
+        # user_id lookups via its leading column.
         Index("ix_notifications_user_created", "user_id", "created_at"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True

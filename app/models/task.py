@@ -21,7 +21,8 @@ class Task(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "tasks"
     __table_args__ = (
         # Covers the common filtered feed: tasks of a project, by status,
-        # ordered by due date.
+        # ordered by due date. Its leading column also serves plain
+        # project_id lookups, so no separate single-column index is defined.
         Index("ix_tasks_project_status_due", "project_id", "status", "due_date"),
         Index("ix_tasks_assignee_status", "assignee_id", "status"),
         # The overdue scan's exact predicate.
@@ -29,7 +30,7 @@ class Task(UUIDPrimaryKey, Timestamps, Base):
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -39,7 +40,7 @@ class Task(UUIDPrimaryKey, Timestamps, Base):
         default=TaskStatus.todo,
     )
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
