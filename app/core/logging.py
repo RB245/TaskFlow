@@ -22,8 +22,7 @@ _request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
 # Attributes LogRecord always carries; anything else was passed via `extra=`
 # and is worth emitting.
 _RESERVED = frozenset(
-    vars(logging.LogRecord("", 0, "", 0, "", (), None)).keys()
-    | {"message", "asctime", "taskName"}
+    vars(logging.LogRecord("", 0, "", 0, "", (), None)).keys() | {"message", "asctime", "taskName"}
 )
 
 
