@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import AuthenticationError
 from app.core.security import decode_access_token
 from app.db.session import get_db
@@ -50,3 +52,26 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+@dataclass(frozen=True)
+class Pagination:
+    page: int
+    page_size: int
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.page_size
+
+
+def pagination_params(
+    page: Annotated[int, Query(ge=1, description="1-indexed page number.")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=settings.max_page_size)] = settings.default_page_size,
+) -> Pagination:
+    # page_size is capped by the Query constraint rather than silently
+    # clamped, so a caller asking for 10_000 rows gets told no instead of
+    # quietly receiving 100 and paginating wrongly.
+    return Pagination(page=page, page_size=page_size)
+
+
+PaginationDep = Annotated[Pagination, Depends(pagination_params)]

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import Timestamps, UUIDPrimaryKey
+from app.models.user import User
 
 
 class ProjectRole(str, enum.Enum):
@@ -55,3 +56,4 @@ class ProjectMember(UUIDPrimaryKey, Timestamps, Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="members")
+    user: Mapped["User"] = relationship(lazy="joined")
