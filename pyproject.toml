@@ -15,6 +15,10 @@ select = ["E", "F", "I", "B", "UP", "C4", "SIM", "RUF"]
 # B008: FastAPI's Depends()/Query() in argument defaults is the documented idiom.
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+# Without this, files outside src/ (alembic/env.py) sort `app` as third-party.
+known-first-party = ["app", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
 "alembic/*" = ["E501"]
 

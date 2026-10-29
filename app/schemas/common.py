@@ -1,10 +1,46 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
+
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class Pagination:
+    """Page coordinates.
+
+    Lives here rather than in ``api/deps`` so the service layer can take one
+    without importing anything HTTP-shaped.
+    """
+
+    page: int
+    page_size: int
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.page_size
+
+
+class PaginationQuery(BaseModel):
+    """Page coordinates as query parameters.
+
+    Endpoints whose filters are a Pydantic query model inherit from this
+    rather than taking a separate pagination dependency: a query model with
+    ``extra="forbid"`` validates the *whole* query string, so `page` arriving
+    from somewhere else would be rejected as an unknown parameter.
+    """
+
+    page: int = Field(default=1, ge=1, description="1-indexed page number.")
+    page_size: int = Field(default=settings.default_page_size, ge=1, le=settings.max_page_size)
+
+    @property
+    def pagination(self) -> Pagination:
+        return Pagination(page=self.page, page_size=self.page_size)
 
 
 class Page(BaseModel, Generic[T]):

@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import AuthenticationError, ConflictError
 from app.core.logging import get_logger
 from app.core.security import (
@@ -19,7 +20,6 @@ from app.core.security import (
     password_needs_rehash,
     verify_password,
 )
-from app.core.config import settings
 from app.models import RefreshToken, User
 from app.schemas.auth import TokenPair
 from app.schemas.user import UserCreate

@@ -56,4 +56,4 @@ class ProjectMember(UUIDPrimaryKey, Timestamps, Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="members")
-    user: Mapped["User"] = relationship(lazy="joined")
+    user: Mapped[User] = relationship(lazy="joined")

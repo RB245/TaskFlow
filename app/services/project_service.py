@@ -32,7 +32,9 @@ def create_project(db: Session, user: User, payload: ProjectCreate) -> Project:
     return project
 
 
-def list_projects(db: Session, user: User, *, page: int, page_size: int) -> tuple[list[Project], int]:
+def list_projects(
+    db: Session, user: User, *, page: int, page_size: int
+) -> tuple[list[Project], int]:
     base = (
         select(Project)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
@@ -108,7 +110,9 @@ def add_member(db: Session, user: User, project_id: uuid.UUID, payload: MemberAd
     return member
 
 
-def remove_member(db: Session, user: User, project_id: uuid.UUID, member_user_id: uuid.UUID) -> None:
+def remove_member(
+    db: Session, user: User, project_id: uuid.UUID, member_user_id: uuid.UUID
+) -> None:
     project = authz.require_project(db, user, project_id, require_owner=True)
 
     if member_user_id == project.owner_id:

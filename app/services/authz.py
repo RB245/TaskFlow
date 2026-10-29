@@ -27,9 +27,7 @@ from app.core.errors import ForbiddenError, NotFoundError
 from app.models import Project, ProjectMember, ProjectRole, User
 
 
-def get_membership(
-    db: Session, user_id: uuid.UUID, project_id: uuid.UUID
-) -> ProjectMember | None:
+def get_membership(db: Session, user_id: uuid.UUID, project_id: uuid.UUID) -> ProjectMember | None:
     return db.scalar(
         select(ProjectMember).where(
             ProjectMember.project_id == project_id,

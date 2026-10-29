@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
@@ -14,6 +13,7 @@ from app.core.errors import AuthenticationError
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models import User
+from app.schemas.common import Pagination
 
 # auto_error=False so a missing header raises our AuthenticationError with the
 # standard error body, rather than FastAPI's own 403 shape.
@@ -52,16 +52,6 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
-
-
-@dataclass(frozen=True)
-class Pagination:
-    page: int
-    page_size: int
-
-    @property
-    def offset(self) -> int:
-        return (self.page - 1) * self.page_size
 
 
 def pagination_params(

@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.core.metrics import CELERY_TASKS, CELERY_TASK_DURATION, OVERDUE_SCAN_TASKS
+from app.core.metrics import CELERY_TASK_DURATION, CELERY_TASKS, OVERDUE_SCAN_TASKS
 from app.db.session import session_scope
 from app.models import NotificationType, Project, Task, TaskStatus
 from app.services.notification_service import create_notification

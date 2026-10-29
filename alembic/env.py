@@ -5,9 +5,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401  (import side effect: registers every table on Base.metadata)
 from app.core.config import settings
 from app.db.base import Base
-from app.models import *  # noqa: F401,F403  (import side effect: register tables)
 
 config = context.config
 if config.config_file_name is not None:
