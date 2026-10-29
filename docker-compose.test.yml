@@ -5,6 +5,10 @@
 #   docker compose -f docker-compose.test.yml up -d
 #   pytest
 
+# Own project name so these never share a network, volume set or container
+# namespace with the full stack in docker-compose.yml.
+name: taskflow-test
+
 services:
   test-db:
     image: postgres:16-alpine

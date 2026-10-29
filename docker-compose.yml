@@ -1,0 +1,154 @@
+# Full stack in one command:
+#
+#   docker compose up --build
+#
+# Brings up Postgres, Redis, a one-shot migration job, the API, a Celery
+# worker and Celery beat. The API waits for migrations to finish, so the
+# first request after `up` already hits a migrated schema.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://taskflow:taskflow@db:5432/taskflow
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  # Local default only. Generate a real one for any deployed environment:
+  #   python -c "import secrets; print(secrets.token_urlsafe(64))"
+  JWT_SECRET: ${JWT_SECRET:-dev-insecure-secret-change-me}
+  ENVIRONMENT: ${ENVIRONMENT:-local}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+  OVERDUE_SCAN_INTERVAL_SECONDS: ${OVERDUE_SCAN_INTERVAL_SECONDS:-60}
+
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: *app-env
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow
+      POSTGRES_DB: taskflow
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    # maxmemory-policy is a correctness setting here, not a tuning knob. The
+    # cache's project-version counters are stored WITHOUT a TTL; volatile-lru
+    # only ever evicts keys that have one, so the counters cannot be dropped
+    # under memory pressure. Switching this to allkeys-lru would make stale
+    # reads possible after an eviction.
+    command:
+      - redis-server
+      - --maxmemory-policy
+      - volatile-lru
+      - --appendonly
+      - "yes"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot. Everything else waits for it to exit 0, so the three app
+  # services never race each other for the migration lock.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *app-env
+    command: ["./scripts/migrate.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app-base
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      # One worker per container: the Prometheus counters live in process
+      # memory, and multiple workers behind one scrape would each report
+      # their own slice. Scale with more containers instead.
+      - --workers
+      - "1"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - app.workers.celery_app.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=2
+    healthcheck:
+      # CMD-SHELL, not CMD: the exec form runs no shell, so $HOSTNAME would
+      # be passed through literally and the ping would address a node that
+      # does not exist.
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.workers.celery_app.celery_app inspect ping -d celery@$$HOSTNAME",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  beat:
+    <<: *app-base
+    command:
+      - celery
+      - -A
+      - app.workers.celery_app.celery_app
+      - beat
+      - --loglevel=info
+      # Schedule file under /tmp because the app user cannot write to /app.
+      - --schedule=/tmp/celerybeat-schedule
+    # Exactly one beat process, ever. Two would double every periodic tick;
+    # the jobs are idempotent so it would not corrupt anything, but it is
+    # wasted work and a surprising thing to find in production.
+    deploy:
+      replicas: 1
+
+volumes:
+  pgdata:
+  redisdata:
