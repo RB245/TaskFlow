@@ -1,0 +1,40 @@
+[project]
+name = "taskflow"
+version = "0.1.0"
+description = "Task management API with background notifications and a cache-backed task feed"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["app", "tests"]
+exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C4", "SIM", "RUF"]
+# B008: FastAPI's Depends()/Query() in argument defaults is the documented idiom.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+exclude = "^(alembic/|tests/)"
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/workers/celery_app.py"]
