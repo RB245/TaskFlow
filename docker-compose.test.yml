@@ -10,7 +10,7 @@
 name: taskflow-test
 
 services:
-  test-db:
+  db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: taskflow
@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 30
 
-  test-redis:
+  redis:
     image: redis:7-alpine
     # See docker-compose.yml for why the eviction policy matters to cache
     # correctness.
